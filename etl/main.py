@@ -41,7 +41,7 @@ def load_data(state: State, extractor: PostgresExtractor, es_loader: Elasticsear
                     es_loader.load_data_to_es(batch_films)
     else:
         for batch_film_work_ids in table_ids:
-            films = extractor.load_films(batch_film_work_ids)
+            films = extractor.load_films([id_[0] for id_ in batch_film_work_ids])
             for batch_films in films:
                 # Load data to Elasticsearch for each batch of films
                 es_loader.load_data_to_es(batch_films)

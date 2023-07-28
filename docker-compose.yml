@@ -6,7 +6,7 @@ services:
     image: postgres:15
     env_file: "etc/environs/postgres.env"
     volumes:
-      - ./postgres_data:/var/lib/postgresql/data
+      - ./storage/postgres_data:/var/lib/postgresql/data
       - ./etc/postgres/movies_database.ddl:/etc/app/movies_database.ddl
       - ./etc/postgres/movies_database.sql:/etc/app/movies_database.sql
       - ./etc/postgres/init_ddl.sh:/docker-entrypoint-initdb.d/init-schema-db.sh
@@ -19,6 +19,8 @@ services:
   redis:
     container_name: redis
     image: redis
+    volumes:
+      - ./storage/redis_data:/data
     healthcheck:
       test: [ "CMD-SHELL", "redis-cli","ping" ]
       interval: 5s
@@ -31,8 +33,12 @@ services:
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
+    ports:
+      - "9200:9200"
     expose:
       - 9200
+    volumes:
+      - ./storage/elastic_search_data/:/usr/share/elasticsearch/data
     healthcheck:
       test: [ "CMD-SHELL", "curl -XGET 'localhost:9200/_cluster/health?pretty'", ]
       interval: 5s
@@ -43,6 +49,7 @@ services:
     container_name: django
     env_file: "etc/environs/django.env"
     build: django_api
+    restart: on-failure
     volumes:
       - ./django_api/static:/opt/app/static:ro
     depends_on:
@@ -53,6 +60,7 @@ services:
     container_name: etl
     env_file: "/etc/environs/etl.env"
     build: etl
+    restart: on-failure
     depends_on:
       elasticsearch:
         condition: service_healthy
