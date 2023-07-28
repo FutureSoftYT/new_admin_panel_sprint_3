@@ -1,0 +1,73 @@
+version: '3'
+
+services:
+  postgres_db:
+    container_name: postgres
+    image: postgres:15
+    env_file: "etc/environs/postgres.env"
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data
+      - ./etc/postgres/movies_database.ddl:/etc/app/movies_database.ddl
+      - ./etc/postgres/movies_database.sql:/etc/app/movies_database.sql
+      - ./etc/postgres/init_ddl.sh:/docker-entrypoint-initdb.d/init-schema-db.sh
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U app -d movies_database", ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    container_name: redis
+    image: redis
+    healthcheck:
+      test: [ "CMD-SHELL", "redis-cli","ping" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  elasticsearch:
+    container_name: elasticsearch
+    image: elasticsearch:8.8.1
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+    expose:
+      - 9200
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -XGET 'localhost:9200/_cluster/health?pretty'", ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  django:
+    container_name: django
+    env_file: "etc/environs/django.env"
+    build: django_api
+    volumes:
+      - ./django_api/static:/opt/app/static:ro
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+
+  etl:
+    container_name: etl
+    env_file: "/etc/environs/etl.env"
+    build: etl
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  nginx:
+    container_name: nginx
+    image: nginx:latest
+    restart: on-failure
+    volumes:
+      - ./etc/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./etc/nginx/conf.d/site.conf:/etc/nginx/conf.d/site.conf:ro
+      - ./django_api/static:/opt/app/static:ro
+    ports:
+      - "80:80"
+    depends_on:
+      - django
