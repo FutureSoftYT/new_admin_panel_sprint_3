@@ -33,8 +33,6 @@ services:
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
-    ports:
-      - "9200:9200"
     expose:
       - 9200
     volumes:
