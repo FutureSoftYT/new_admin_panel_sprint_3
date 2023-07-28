@@ -1,6 +1,7 @@
-import logging
 from functools import wraps
 from time import sleep
+
+from logger import logger
 
 
 def backoff(start_sleep_time=0.1, factor=2, border_sleep_time=10):
@@ -26,8 +27,8 @@ def backoff(start_sleep_time=0.1, factor=2, border_sleep_time=10):
                     result = func(*args, **kwargs)
                     break
                 except Exception as e:
-                    logging.error('App stop with error: %s', (e,))
-                    logging.info('Will retry in: %s seconds', (sleep_time,))
+                    logger.error('App stop with error: %s', (e,))
+                    logger.info('Will retry in: %s seconds', (sleep_time,))
 
                 sleep(sleep_time)
                 new_sleep_time = sleep_time * 2 ** factor

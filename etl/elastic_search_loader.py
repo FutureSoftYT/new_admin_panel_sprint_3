@@ -31,7 +31,7 @@ class ElasticsearchLoader:
         self.es_host = es_host
         self.es_port = es_port
         self.es_index = es_index
-        self.es = Elasticsearch("http://localhost:9200")
+        self.es = Elasticsearch(f"http://{es_host}:{es_port}")
 
         if self.is_index_exists() is False:
             logger.info("Creating index %s ....", (es_index,))
@@ -39,6 +39,7 @@ class ElasticsearchLoader:
                 # Creating index
                 self.es.indices.create(index=es_index, mappings=mappings, settings=settings)
                 logger.info("Index %s created successfully!", (es_index,))
+
             except Exception as e:
                 logging.error("Something went wrong while creating index %s , Error: %s", (es_index, e))
                 raise Exception
@@ -64,7 +65,7 @@ class ElasticsearchLoader:
             doc = {
                 "_index": self.es_index,
                 "_id": film.id,
-                "_source": film.model_dump()
+                "_source": film.model_dump(exclude={'modified'})
             }
             documents.append(doc)
 
@@ -73,4 +74,4 @@ class ElasticsearchLoader:
             logger.info('Loading complete! %s Films uploaded!', len(documents))
         except Exception as e:
             logging.error('Loading to Elastic Search failed, Error: %s', (e,))
-            raise Exception
+            raise Exception(e)

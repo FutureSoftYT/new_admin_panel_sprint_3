@@ -1,3 +1,4 @@
+import datetime
 from typing import List, Optional
 
 from pydantic import BaseModel
@@ -10,6 +11,7 @@ class Person(BaseModel):
 
 class FilmWork(BaseModel):
     id: str
+    modified: datetime.datetime
     imdb_rating: Optional[float] = 0.00
     genre: List[Optional[str]]
     title: Optional[str]

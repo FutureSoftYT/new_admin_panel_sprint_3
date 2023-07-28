@@ -1,6 +1,6 @@
 import datetime
 import uuid
-from typing import List, Optional, Union, Generator
+from typing import List, Optional, Union, Generator, Tuple
 
 from psycopg2._psycopg import connection
 from psycopg2.extras import DictCursor
@@ -52,7 +52,7 @@ class PostgresExtractor:
             self.time = None
 
     @backoff()
-    def load_table_ids(self, table: str) -> Generator[List[uuid.UUID], None, None]:
+    def load_table_ids(self, table: str) -> Generator[List[Tuple[uuid.UUID, datetime.datetime]], None, None]:
         """
         Fetches the 'id' values from the specified table in the Postgres database.
 
@@ -69,7 +69,7 @@ class PostgresExtractor:
             the 'modified' column based on the provided time.
         """
         cursor = self.connection.cursor()
-        query = f"""SELECT id
+        query = f"""SELECT id, modified
         FROM {self.schema}.{table}
         {"WHERE modified > %s" if self.time else ''}
         ORDER BY modified
@@ -85,15 +85,15 @@ class PostgresExtractor:
             cursor.close()
 
     @backoff()
-    def load_film_ids(self, m2m_table: str, column_id: str, ids: List[uuid.UUID]) -> Generator[
-        List[uuid.UUID], None, None]:
+    def load_film_ids(self, m2m_table: str, column_id: str, ids: List[Tuple[uuid.UUID, datetime.datetime]]) -> \
+    Generator[List[uuid.UUID], None, None]:
         """
         Fetches FilmWork 'id' values based on the provided m2m_table and column_id.
 
         Args:
             m2m_table (str): The name of the m2m table to join with the FilmWork table.
             column_id (str): The column ID representing the relationship with FilmWork.
-            ids (List[uuid.UUID]): A list of UUIDs representing the IDs to match in the m2m_table.
+            ids (List[Tuple[uuid.UUID, datetime.datetime]]): A list of UUIDs and modified time representing the IDs to match in the m2m_table.
 
         Yields:
             Generator[List[uuid.UUID], None, None]: A generator that yields batches of 'id' values
@@ -111,7 +111,7 @@ class PostgresExtractor:
         """
 
         try:
-            cursor.execute(query, ids)
+            cursor.execute(query, [id_[0] for id_ in ids])
             while data := cursor.fetchmany(self.chunk_size):
                 yield data
         finally:
@@ -135,6 +135,7 @@ class PostgresExtractor:
         query = f"""
 SELECT
     fw.id,
+    fw.modified,
     fw.rating AS imdb_rating,
     fw.description,
     fw.title,
@@ -166,7 +167,7 @@ LEFT JOIN {self.schema}.person p ON p.id = pfw.person_id
 LEFT JOIN {self.schema}.genre_film_work gfw ON gfw.film_work_id = fw.id
 LEFT JOIN {self.schema}.genre g ON g.id = gfw.genre_id
 WHERE fw.id  IN ({', '.join(['%s'] * len(film_ids))})
-GROUP BY fw.id, fw.rating, fw.description, fw.title;
+GROUP BY fw.id, fw.modified, fw.rating, fw.description, fw.title;
 """
         try:
             cursor.execute(query, film_ids)
