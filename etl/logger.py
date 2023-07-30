@@ -1,8 +1,11 @@
 import logging
 from logging.handlers import RotatingFileHandler
 
+from etl.config import LOG_LEVEL
+
+# Set up the logger
 logger = logging.getLogger('etl_application')
-logger.setLevel(logging.INFO)
+logger.setLevel(LOG_LEVEL)
 
 # INFO-level handler
 fh = RotatingFileHandler('logs/etl_logs.log')

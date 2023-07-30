@@ -3,8 +3,9 @@ from time import sleep
 import psycopg2
 from redis.client import Redis
 
-from config import *
 from elastic_search_loader import ElasticsearchLoader
+from etl.config import TABLES_DATA, FILM_WORK_TABLE, REDIS_URL, DSL, SCHEMA_CONTENT, ES_HOST, ES_PORT, INDEX_NAME, \
+    ES_MAPPINGS, ES_SETTINGS, SLEEP_TIME
 from logger import logger
 from postgres_extractor import PostgresExtractor
 from state import RedisStorage, State
@@ -13,42 +14,39 @@ from state import RedisStorage, State
 def load_data(state: State, extractor: PostgresExtractor, es_loader: ElasticsearchLoader):
     # Get the last execution time and queue index from the state
     last_modified = state.get_state('last_modified')
-    queue_index = int(state.get_state('queue_index', 0)) % len(TABLES_DATA.keys())
+    queue_index = state.get_state('queue_index', 0)
+    queue_index = int(queue_index) % len(TABLES_DATA.keys())
 
     # Setting time to filter by modified column
     extractor.update_time(last_modified)
 
-    # Getting current datas
+    # Getting current table datas
     table, m2m, column_id = TABLES_DATA[queue_index]
 
     logger.info("Current queue %s, working on table %s, filtering time %s", *(queue_index, table, extractor.time))
 
-    # Getting ids from the current table
     table_ids = extractor.load_table_ids(table)
 
     if table != FILM_WORK_TABLE:
         for batch_table_ids in table_ids:
             # Update the state with the last_modified
             state.set_state('last_modified', batch_table_ids[-1][-1].isoformat())
-            # If the current table is not the FilmWork table, then we need to get ids of FilmWork tables
-            # according to the m2m tables
+
             film_work_ids = extractor.load_film_ids(m2m, column_id, batch_table_ids)
-            # Loop through the film_work_ids in batches and load films for each batch
+
             for batch_film_work_ids in film_work_ids:
                 films = extractor.load_films(batch_film_work_ids)
                 for batch_films in films:
-                    # Load data to Elasticsearch for each batch of films
                     es_loader.load_data_to_es(batch_films)
     else:
         for batch_film_work_ids in table_ids:
             films = extractor.load_films([id_[0] for id_ in batch_film_work_ids])
+
             for batch_films in films:
-                # Load data to Elasticsearch for each batch of films
                 es_loader.load_data_to_es(batch_films)
                 # Update the state with the last_modified
                 state.set_state('last_modified', batch_films[-1].modified.isoformat())
 
-    # Update the state with the queue index
     queue_index += 1
     state.set_state('queue_index', queue_index)
 
@@ -68,7 +66,7 @@ def main():
                                             settings=ES_SETTINGS)
             while True:
                 load_data(state, extractor, es_loader)
-                sleep(2)
+                sleep(int(SLEEP_TIME))
     finally:
         pg_connection.close()
 

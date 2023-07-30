@@ -16,6 +16,9 @@ REDIS_HOST = os.environ.get('REDIS_HOST')
 REDIS_PORT = os.environ.get('REDIS_PORT')
 REDIS_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/0"
 
+SLEEP_TIME = os.environ.get('SLEEP_TIME', 2)
+LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO')
+
 TABLES_DATA = {
     0: (FILM_WORK_TABLE, '', ''),
     1: (PERSON_TABLE, FILM_WORK_PERSON_M2M_TABLE, 'person_id'),
